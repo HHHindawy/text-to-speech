@@ -24,7 +24,7 @@ const App = () => {
     return efficientText.trim().toLowerCase();
   };
 
-  const onFetchAudio = async () => {
+  const onPlayAudio = () => {
     if (text) {
       setPlayLoading(true);
       try {
@@ -35,54 +35,58 @@ const App = () => {
           playSaved(audioKey, savedAudio);
         } else {
           // Request a new audio.
-          await axios
-            .post(
-              `${process.env.REACT_APP_IBM_BASE_URL}/v1/synthesize`,
-              {
-                text
-              },
-              {
-                auth: {
-                  username: 'apikey',
-                  password: process.env.REACT_APP_IBM_API_KEY
-                },
-                responseType: 'blob',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Accept: 'audio/ogg'
-                }
-              }
-            )
-            .then((response) => {
-              setAudioPlaying(true);
-              const audioReader = new FileReader();
-              audioReader.readAsDataURL(response.data);
-              audioReader.onload = () => {
-                // Store in localStorage or replace the least recently used audio if limit reached.
-                if (localStorage.length >= MAX_NUM_OF_ITEMS) {
-                  localStorage.removeItem(getLeastRecentlyUsedKey());
-                }
-
-                localStorage.setItem(
-                  audioKey,
-                  JSON.stringify({
-                    audio: audioReader.result,
-                    lastUsed: moment().format('x'),
-                    text
-                  })
-                );
-              };
-              audioReader.onerror = (error) => console.error(error);
-              const audioUrl = URL.createObjectURL(response.data);
-              setAudioSrc(audioUrl);
-            })
-            .catch((err) => console.error(err))
-            .finally(() => setPlayLoading(false));
+          fetchAudio(audioKey, savedAudio);
         }
       } catch (error) {
         console.error(error);
       }
     }
+  };
+
+  const fetchAudio = async (audioKey) => {
+    await axios
+      .post(
+        `${process.env.REACT_APP_IBM_BASE_URL}/v1/synthesize`,
+        {
+          text
+        },
+        {
+          auth: {
+            username: 'apikey',
+            password: process.env.REACT_APP_IBM_API_KEY
+          },
+          responseType: 'blob',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'audio/ogg'
+          }
+        }
+      )
+      .then((response) => {
+        setAudioPlaying(true);
+        const audioReader = new FileReader();
+        audioReader.readAsDataURL(response.data);
+        audioReader.onload = () => {
+          // Store in localStorage or replace the least recently used audio if limit reached.
+          if (localStorage.length >= MAX_NUM_OF_ITEMS) {
+            localStorage.removeItem(getLeastRecentlyUsedKey());
+          }
+
+          localStorage.setItem(
+            audioKey,
+            JSON.stringify({
+              audio: audioReader.result,
+              lastUsed: moment().format('x'),
+              text
+            })
+          );
+        };
+        audioReader.onerror = (error) => console.error(error);
+        const audioUrl = URL.createObjectURL(response.data);
+        setAudioSrc(audioUrl);
+      })
+      .catch((err) => console.error(err))
+      .finally(() => setPlayLoading(false));
   };
 
   const getLeastRecentlyUsedKey = () => {
@@ -101,9 +105,13 @@ const App = () => {
   };
 
   const playSaved = async (audioKey, audioObject, replaceText = false) => {
+    // Revoke previous media url before creating a new one to release the existing file reference.
+    URL.revokeObjectURL(audioSrc);
+
     const parsedAudioObject = JSON.parse(audioObject);
     // Replace text if playing text from history.
     if (replaceText) setText(parsedAudioObject.text);
+
     const encodedAudioURL = parsedAudioObject.audio;
     setPlayLoading(true);
     await axios
@@ -126,8 +134,6 @@ const App = () => {
         lastUsed: moment().format('x')
       })
     );
-
-    // Revoke previous media url before creating a new one.
   };
 
   return (
@@ -142,9 +148,7 @@ const App = () => {
                   key={key}
                   type="button"
                   disabled={playLoading || audioPlaying}
-                  className={`list-group-item list-group-item-action btn-sm history-list-item ${
-                    JSON.parse(value).text === text ? 'active' : ''
-                  }`}
+                  className="list-group-item list-group-item-action btn-sm history-list-item"
                   onClick={() => playSaved(key, value, true)}
                 >
                   {JSON.parse(value).text}
@@ -172,7 +176,7 @@ const App = () => {
                   type="button"
                   disabled={!text}
                   className="btn btn-light mt-3"
-                  onClick={audioPlaying ? onStopAudio : onFetchAudio}
+                  onClick={audioPlaying ? onStopAudio : onPlayAudio}
                 >
                   {playLoading && <Spinner size="sm" animation="border" />}
                   {!playLoading && (
