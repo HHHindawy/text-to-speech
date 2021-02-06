@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import axios from 'axios';
 import moment from 'moment';
 import { Spinner } from 'react-bootstrap';
+import logo from './styles/assets/logo.svg';
 import './App.scss';
 
 const App = () => {
@@ -137,11 +138,15 @@ const App = () => {
   };
 
   return (
-    <div className="App">
+    <div className="app">
+      <div className="header">
+        Text To Speech
+        <img src={logo} alt="logo" className="header-logo" />
+      </div>
       <div className="container">
-        <div className="row">
+        <div className="row align-items-center">
           <div className="col-md-12 col-lg-3 history mb-5">
-            <div className="mb-2">History</div>
+            <div className="history-title mb-2">History</div>
             <div className="list-group history-list">
               {Object.entries(localStorage).map(([key, value]) => (
                 <button
@@ -158,9 +163,11 @@ const App = () => {
           </div>
 
           <div className="col-md-12 col-lg-9">
-            <form>
+            <form className="form">
               <div className="text-left">
-                <label htmlFor="text">Enter text:</label>
+                <label htmlFor="text" className="form-title">
+                  Enter text:
+                </label>
                 <textarea
                   className="form-control"
                   id="text"
