@@ -36,7 +36,7 @@ const App = () => {
           playSaved(audioKey, savedAudio);
         } else {
           // Request a new audio.
-          fetchAudio(audioKey, savedAudio);
+          fetchAudio(audioKey);
         }
       } catch (error) {
         console.error(error);
@@ -81,10 +81,9 @@ const App = () => {
               text
             })
           );
+          setAudioSrc(audioReader.result);
         };
         audioReader.onerror = (error) => console.error(error);
-        const audioUrl = URL.createObjectURL(response.data);
-        setAudioSrc(audioUrl);
       })
       .catch((err) => console.error(err))
       .finally(() => setPlayLoading(false));
@@ -92,8 +91,8 @@ const App = () => {
 
   const getLeastRecentlyUsedKey = () => {
     return Object.keys(localStorage).reduce((key1, key2) =>
-      JSON.parse(localStorage[key2]).lastUsed <
-      JSON.parse(localStorage[key1]).lastUsed
+      JSON.parse(localStorage.getItem(key2)).lastUsed <
+      JSON.parse(localStorage.getItem(key1)).lastUsed
         ? key2
         : key1
     );
@@ -103,29 +102,17 @@ const App = () => {
     audioRef.current.pause();
     audioRef.current.currentTime = 0;
     setAudioPlaying(false);
+    setAudioSrc(null);
   };
 
   const playSaved = async (audioKey, audioObject, replaceText = false) => {
-    // Revoke previous media url before creating a new one to release the existing file reference.
-    URL.revokeObjectURL(audioSrc);
-
+    setAudioPlaying(true);
     const parsedAudioObject = JSON.parse(audioObject);
     // Replace text if playing text from history.
     if (replaceText) setText(parsedAudioObject.text);
 
     const encodedAudioURL = parsedAudioObject.audio;
-    setPlayLoading(true);
-    await axios
-      .get(encodedAudioURL, {
-        responseType: 'blob'
-      })
-      .then((response) => {
-        setAudioPlaying(true);
-        const audioUrl = URL.createObjectURL(response.data);
-        setAudioSrc(audioUrl);
-      })
-      .catch((err) => console.error(err))
-      .finally(() => setPlayLoading(false));
+    setAudioSrc(encodedAudioURL);
 
     // Update last used time for audio in localStorage.
     localStorage.setItem(
@@ -135,6 +122,29 @@ const App = () => {
         lastUsed: moment().format('x')
       })
     );
+    setPlayLoading(false);
+  };
+
+  const renderHistory = () => {
+    const items = [];
+    for (let key in localStorage) {
+      if (!localStorage.getItem(key)) {
+        continue;
+      }
+      items.push({ key, value: localStorage.getItem(key) });
+    }
+
+    return items.map((item) => (
+      <button
+        key={item.key}
+        type="button"
+        disabled={playLoading || audioPlaying}
+        className="list-group-item list-group-item-action btn-sm history-list-item"
+        onClick={() => playSaved(item.key, item.value, true)}
+      >
+        {JSON.parse(item.value).text}
+      </button>
+    ));
   };
 
   return (
@@ -147,19 +157,7 @@ const App = () => {
         <div className="row align-items-center">
           <div className="col-md-12 col-lg-3 history mb-5">
             <div className="history-title mb-2">History</div>
-            <div className="list-group history-list">
-              {Object.entries(localStorage).map(([key, value]) => (
-                <button
-                  key={key}
-                  type="button"
-                  disabled={playLoading || audioPlaying}
-                  className="list-group-item list-group-item-action btn-sm history-list-item"
-                  onClick={() => playSaved(key, value, true)}
-                >
-                  {JSON.parse(value).text}
-                </button>
-              ))}
-            </div>
+            <div className="list-group history-list">{renderHistory()}</div>
           </div>
 
           <div className="col-md-12 col-lg-9">
@@ -200,7 +198,7 @@ const App = () => {
       <audio
         ref={audioRef}
         autoPlay
-        onEnded={() => setAudioPlaying(false)}
+        onEnded={onStopAudio}
         src={audioSrc}
         type="audio/ogg"
       >
